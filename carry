@@ -18,7 +18,7 @@ local ReviveBar = ButtonUI:WaitForChild("ReviveBar")
 local ReviveProgress = ReviveBar:WaitForChild("ReviveProgress")
 
 local CarryHandler = CarryUI:WaitForChild("CarryHandler")
-local Highlight = CarryHandler:WaitForChild("DownedHighlight")
+local HighlightTemplate = CarryHandler:WaitForChild("DownedHighlight")
 
 local CarryAnimations = ReplicatedStorage
 	:WaitForChild("GeneralAssets")
@@ -30,7 +30,6 @@ local CarryAnim = Animator:LoadAnimation(CarryAnimations:WaitForChild("Carry"))
 local CarriedAnim = Animator:LoadAnimation(CarryAnimations:WaitForChild("Carried"))
 
 CarryHandler.Disabled = true
-Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 
 local RANGE = 8
 local DEBOUNCE = 0.5
@@ -49,8 +48,22 @@ local RangeFolder = Instance.new("Folder")
 RangeFolder.Name = "CarryRange"
 RangeFolder.Parent = workspace
 
+local function createHighlight(character, color)
+	if character:FindFirstChild("DownedHighlight") then
+		character.DownedHighlight:Destroy()
+	end
+
+	local highlight = HighlightTemplate:Clone()
+	highlight.Adornee = character
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.FillColor = color
+	highlight.OutlineColor = color
+	highlight.Parent = character
+end
+
 local function addRange(character)
 	local root = character:FindFirstChild("HumanoidRootPart")
+
 	if not root or root:FindFirstChild("CarryRange") then
 		return
 	end
@@ -74,16 +87,32 @@ local function removeRange(character)
 	end
 end
 
-for _, character in ipairs(DownedCharacters:GetChildren()) do
+local function setupDownedPlayer(character)
+	if character == Character then
+		return
+	end
+
+	character:WaitForChild("HumanoidRootPart", 3)
+
+	if not character.Parent then
+		return
+	end
+
 	addRange(character)
+	createHighlight(character, Color3.fromRGB(255, 0, 0))
+end
+
+for _, character in ipairs(DownedCharacters:GetChildren()) do
+	setupDownedPlayer(character)
 end
 
 DownedCharacters.ChildAdded:Connect(function(character)
-	character:WaitForChild("HumanoidRootPart", 3)
-	addRange(character)
+	setupDownedPlayer(character)
 end)
 
-DownedCharacters.ChildRemoved:Connect(removeRange)
+DownedCharacters.ChildRemoved:Connect(function(character)
+	removeRange(character)
+end)
 
 Humanoid:GetAttributeChangedSignal("Carried"):Connect(function()
 	if Humanoid:GetAttribute("Carried") then
@@ -153,6 +182,7 @@ local function carry()
 	end
 
 	CarryDebounce = true
+
 	task.delay(DEBOUNCE, function()
 		CarryDebounce = false
 	end)
@@ -181,7 +211,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 while task.wait(0.2) do
-	local closest
+	local closest = nil
 	local distance = RANGE
 
 	local free =
@@ -212,16 +242,13 @@ while task.wait(0.2) do
 
 	if closest ~= Target then
 		if Target then
-			local oldHighlight = Target:FindFirstChild("DownedHighlight")
-			if oldHighlight then
-				oldHighlight:Destroy()
-			end
+			createHighlight(Target, Color3.fromRGB(255, 0, 0))
 		end
 
 		Target = closest
 
 		if Target then
-			Highlight:Clone().Parent = Target
+			createHighlight(Target, Color3.fromRGB(0, 255, 0))
 
 			ButtonUI.Visible = true
 			ButtonUI.CarryButton.Visible = true
