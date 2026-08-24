@@ -6,332 +6,236 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local DownedCharacters = workspace:WaitForChild("DownedCharacters")
 
-ReplicatedStorage:WaitForChild("RemoteEvents"):WaitForChild("PlayerEvent")
-
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
+local RootPart = Character:WaitForChild("HumanoidRootPart")
 local Animator = Humanoid:WaitForChild("Animator")
-local CarryAnotherPlayer = Character:WaitForChild("StateHandler"):WaitForChild("CarryAnotherPlayer")
+local Carry = Character:WaitForChild("StateHandler"):WaitForChild("CarryAnotherPlayer")
 
-local CarryAnimFolder = ReplicatedStorage
+local CarryUI = LocalPlayer.PlayerGui:WaitForChild("PlayerGUI"):WaitForChild("CarryUI")
+local ButtonUI = CarryUI:WaitForChild("ButtonUI")
+local ReviveBar = ButtonUI:WaitForChild("ReviveBar")
+local ReviveProgress = ReviveBar:WaitForChild("ReviveProgress")
+
+local CarryHandler = CarryUI:WaitForChild("CarryHandler")
+local Highlight = CarryHandler:WaitForChild("DownedHighlight")
+
+local CarryAnimations = ReplicatedStorage
 	:WaitForChild("GeneralAssets")
 	:WaitForChild("Animations")
 	:WaitForChild("CarryAnimations")
 	:WaitForChild(LocalPlayer:GetAttribute("CarryAnimation"))
 
-local CarryAnimTrack = Animator:LoadAnimation(CarryAnimFolder:WaitForChild("Carry"))
-local CarriedAnimTrack = Animator:LoadAnimation(CarryAnimFolder:WaitForChild("Carried"))
+local CarryAnim = Animator:LoadAnimation(CarryAnimations:WaitForChild("Carry"))
+local CarriedAnim = Animator:LoadAnimation(CarryAnimations:WaitForChild("Carried"))
 
-local CarryHandlerScript = LocalPlayer:WaitForChild("PlayerGui")
-	:WaitForChild("PlayerGUI")
-	:WaitForChild("CarryUI")
-	:WaitForChild("CarryHandler")
+CarryHandler.Disabled = true
+Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 
-local DownedHighlightTemplate = CarryHandlerScript:WaitForChild("DownedHighlight")
+local RANGE = 8
+local DEBOUNCE = 0.5
 
-if CarryHandlerScript:IsA("LocalScript") then
-	CarryHandlerScript.Disabled = true
-end
-
-task.wait(3)
-
-local CarryUI = LocalPlayer.PlayerGui
-	:WaitForChild("PlayerGUI")
-	:WaitForChild("CarryUI")
-
-local ButtonUI = CarryUI:WaitForChild("ButtonUI")
-local ReviveBar = ButtonUI:WaitForChild("ReviveBar")
-local ReviveProgress = ReviveBar:WaitForChild("ReviveProgress")
-
-local TargetDowned = nil
+local Target = nil
 local ReviveTarget = nil
-
-local ReviveTime = Humanoid:GetAttribute("ReviveTime")
+local CarryDebounce = false
 
 local ReviveTween = TweenService:Create(
 	ReviveProgress,
-	TweenInfo.new(ReviveTime, Enum.EasingStyle.Linear),
-	{
-		Size = UDim2.fromScale(0, 1)
-	}
+	TweenInfo.new(Humanoid:GetAttribute("ReviveTime"), Enum.EasingStyle.Linear),
+	{ Size = UDim2.fromScale(0, 1) }
 )
 
-local INTERACTION_RANGE = 8
-local PICKUP_DEBOUNCE = 0.5
-
-local carryDebounce = false
-local highlightedChar = nil
-
 local RangeFolder = Instance.new("Folder")
-RangeFolder.Name = "CarryRangeBoxes"
+RangeFolder.Name = "CarryRange"
 RangeFolder.Parent = workspace
 
-local RangeBoxes = {}
-
-local function createRangeBox(character)
-	if RangeBoxes[character] then
-		return
-	end
-
+local function addRange(character)
 	local root = character:FindFirstChild("HumanoidRootPart")
-
-	if not root then
+	if not root or root:FindFirstChild("CarryRange") then
 		return
 	end
 
 	local box = Instance.new("BoxHandleAdornment")
 	box.Name = "CarryRange"
 	box.Adornee = root
-	box.Size = Vector3.new(
-		INTERACTION_RANGE * 2,
-		INTERACTION_RANGE * 2,
-		INTERACTION_RANGE * 2
-	)
-	box.CFrame = CFrame.new()
+	box.Size = Vector3.new(RANGE * 2, RANGE * 2, RANGE * 2)
 	box.Transparency = 0.8
 	box.Color3 = Color3.fromRGB(255, 170, 0)
 	box.AlwaysOnTop = false
-	box.ZIndex = 5
 	box.Parent = RangeFolder
-
-	RangeBoxes[character] = box
 end
 
-local function removeRangeBox(character)
-	local box = RangeBoxes[character]
+local function removeRange(character)
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local box = root and root:FindFirstChild("CarryRange")
 
 	if box then
 		box:Destroy()
-		RangeBoxes[character] = nil
 	end
-end
-
-local function createHighlight(character)
-	local highlight = DownedHighlightTemplate:Clone()
-
-	if highlight:IsA("Highlight") then
-		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	end
-
-	highlight.Parent = character
 end
 
 for _, character in ipairs(DownedCharacters:GetChildren()) do
-	createRangeBox(character)
+	addRange(character)
 end
 
 DownedCharacters.ChildAdded:Connect(function(character)
-	task.wait()
-
-	if character:FindFirstChild("HumanoidRootPart") then
-		createRangeBox(character)
-	else
-		character:WaitForChild("HumanoidRootPart", 3)
-
-		if character.Parent then
-			createRangeBox(character)
-		end
-	end
+	character:WaitForChild("HumanoidRootPart", 3)
+	addRange(character)
 end)
 
-DownedCharacters.ChildRemoved:Connect(function(character)
-	removeRangeBox(character)
-end)
+DownedCharacters.ChildRemoved:Connect(removeRange)
 
 Humanoid:GetAttributeChangedSignal("Carried"):Connect(function()
 	if Humanoid:GetAttribute("Carried") then
-		CarriedAnimTrack:Play()
+		CarriedAnim:Play()
 	else
-		CarriedAnimTrack:Stop()
+		CarriedAnim:Stop()
 	end
 end)
 
 Humanoid:GetAttributeChangedSignal("Carrying"):Connect(function()
 	if Humanoid:GetAttribute("Carrying") then
-		CarryAnimTrack:Play()
+		CarryAnim:Play()
 	else
-		CarryAnimTrack:Stop()
+		CarryAnim:Stop()
 	end
 end)
 
-local function RevivePressed()
-	local canAttempt =
-		TargetDowned
-		and not ReviveTarget
-		and TargetDowned:FindFirstChild("StateHandler")
-
-	if not canAttempt then
+local function revive()
+	if not Target or ReviveTarget then
 		return
 	end
 
-	local attemptRevive = canAttempt:FindFirstChild("AttemptRevive")
+	local state = Target:FindFirstChild("StateHandler")
+	local attempt = state and state:FindFirstChild("AttemptRevive")
 
-	if not attemptRevive then
+	if not attempt or not attempt:InvokeServer() then
 		return
 	end
 
-	if attemptRevive:InvokeServer() then
-		ReviveTarget = TargetDowned
+	ReviveTarget = Target
+	ReviveProgress.Size = UDim2.fromScale(1, 1)
+	ReviveBar.Visible = true
+	ReviveTween:Play()
 
-		ReviveProgress.Size = UDim2.fromScale(1, 1)
-		ReviveBar.Visible = true
+	task.spawn(function()
+		while ReviveTarget do
+			task.wait(0.1)
 
-		ReviveTween:Play()
+			local root = ReviveTarget:FindFirstChild("HumanoidRootPart")
+			local humanoid = ReviveTarget:FindFirstChild("Humanoid")
 
-		task.spawn(function()
-			while task.wait(0.1) do
-				if not ReviveTarget then
-					return
-				end
-
-				local targetRoot = ReviveTarget:FindFirstChild("HumanoidRootPart")
-				local targetHumanoid = ReviveTarget:FindFirstChild("Humanoid")
-
-				local shouldCancel =
-					not targetRoot
-					or not targetHumanoid
-					or (HumanoidRootPart.Position - targetRoot.Position).Magnitude > INTERACTION_RANGE
-					or not targetHumanoid:GetAttribute("BeingRevived")
-					or not targetHumanoid:GetAttribute("Downed")
-					or Humanoid:GetAttribute("Downed")
-					or Humanoid:GetAttribute("Ragdolled")
-					or Humanoid:GetState() == Enum.HumanoidStateType.Dead
-
-				if shouldCancel then
-					ReviveTarget = nil
-					ReviveTween:Cancel()
-					ReviveProgress.Size = UDim2.fromScale(1, 1)
-					ReviveBar.Visible = false
-					return
-				end
+			if not root
+				or not humanoid
+				or (RootPart.Position - root.Position).Magnitude > RANGE
+				or not humanoid:GetAttribute("BeingRevived")
+				or not humanoid:GetAttribute("Downed")
+			then
+				ReviveTarget = nil
+				ReviveTween:Cancel()
+				ReviveBar.Visible = false
+				break
 			end
-		end)
-	end
+		end
+	end)
 end
 
-ReviveTween.Completed:Connect(function(playbackState)
-	if playbackState == Enum.PlaybackState.Completed and ReviveTarget then
+ReviveTween.Completed:Connect(function(state)
+	if state == Enum.PlaybackState.Completed then
 		ReviveTarget = nil
 		ReviveBar.Visible = false
 	end
 end)
 
-local function CarryPressed()
-	if carryDebounce then
+local function carry()
+	if CarryDebounce then
 		return
 	end
 
-	if TargetDowned then
-		carryDebounce = true
+	CarryDebounce = true
+	task.delay(DEBOUNCE, function()
+		CarryDebounce = false
+	end)
 
-		task.delay(PICKUP_DEBOUNCE, function()
-			carryDebounce = false
-		end)
-
-		CarryAnotherPlayer:FireServer(TargetDowned)
-
-		return
-	end
-
-	if Humanoid:GetAttribute("Carrying") then
-		carryDebounce = true
-
-		task.delay(PICKUP_DEBOUNCE, function()
-			carryDebounce = false
-		end)
-
-		CarryAnotherPlayer:FireServer()
+	if Target then
+		Carry:FireServer(Target)
+	elseif Humanoid:GetAttribute("Carrying") then
+		Carry:FireServer()
 	end
 end
 
-ButtonUI.ReviveButton.MouseButton1Click:Connect(RevivePressed)
-ButtonUI.CarryButton.MouseButton1Click:Connect(CarryPressed)
-ButtonUI.DropButton.MouseButton1Click:Connect(CarryPressed)
+ButtonUI.ReviveButton.MouseButton1Click:Connect(revive)
+ButtonUI.CarryButton.MouseButton1Click:Connect(carry)
+ButtonUI.DropButton.MouseButton1Click:Connect(carry)
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then
-		return
-	end
-
-	if UserInputService:GetFocusedTextBox() then
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed or UserInputService:GetFocusedTextBox() then
 		return
 	end
 
 	if input.KeyCode == Enum.KeyCode.Q then
-		CarryPressed()
+		carry()
 	elseif input.KeyCode == Enum.KeyCode.E then
-		RevivePressed()
+		revive()
 	end
 end)
 
 while task.wait(0.2) do
-	local closest = nil
-	local closestDist = math.huge
+	local closest
+	local distance = RANGE
 
-	local isFree =
-		Humanoid:GetAttribute("Downed") == false
+	local free =
+		not Humanoid:GetAttribute("Downed")
 		and Humanoid:GetState() ~= Enum.HumanoidStateType.Dead
 		and not LocalPlayer:GetAttribute("Ghost")
-		and Humanoid:GetAttribute("Ragdolled") == false
+		and not Humanoid:GetAttribute("Ragdolled")
 
-	if isFree then
-		for _, other in pairs(DownedCharacters:GetChildren()) do
-			if other ~= Character then
-				local otherRoot = other:FindFirstChild("HumanoidRootPart")
-				local otherHumanoid = other:FindFirstChild("Humanoid")
+	if free then
+		for _, character in ipairs(DownedCharacters:GetChildren()) do
+			local root = character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character:FindFirstChild("Humanoid")
 
-				if otherRoot and otherHumanoid then
-					local dist =
-						(HumanoidRootPart.Position - otherRoot.Position).Magnitude
+			if root and humanoid then
+				local dist = (RootPart.Position - root.Position).Magnitude
 
-					if
-						dist < closestDist
-						and dist <= INTERACTION_RANGE
-						and otherHumanoid:GetState() ~= Enum.HumanoidStateType.Dead
-						and not otherHumanoid:GetAttribute("Carried")
-						and not otherHumanoid:GetAttribute("Ragdolled")
-					then
-						closest = other
-						closestDist = dist
-					end
+				if dist <= distance
+					and humanoid:GetState() ~= Enum.HumanoidStateType.Dead
+					and not humanoid:GetAttribute("Carried")
+					and not humanoid:GetAttribute("Ragdolled")
+				then
+					closest = character
+					distance = dist
 				end
 			end
 		end
+	end
 
-		if closest then
-			if highlightedChar ~= closest then
-				if highlightedChar and highlightedChar:FindFirstChild("DownedHighlight") then
-					highlightedChar.DownedHighlight:Destroy()
-				end
-
-				TargetDowned = closest
-				createHighlight(TargetDowned)
-
-				ButtonUI.DropButton.Visible = false
-				ButtonUI.CarryButton.Visible = true
-				ButtonUI.ReviveButton.Visible = true
-				ButtonUI.Visible = true
-
-				highlightedChar = TargetDowned
+	if closest ~= Target then
+		if Target then
+			local oldHighlight = Target:FindFirstChild("DownedHighlight")
+			if oldHighlight then
+				oldHighlight:Destroy()
 			end
+		end
+
+		Target = closest
+
+		if Target then
+			Highlight:Clone().Parent = Target
+
+			ButtonUI.Visible = true
+			ButtonUI.CarryButton.Visible = true
+			ButtonUI.ReviveButton.Visible = true
+			ButtonUI.DropButton.Visible = false
 		else
-			if highlightedChar and highlightedChar:FindFirstChild("DownedHighlight") then
-				highlightedChar.DownedHighlight:Destroy()
-			end
-
-			TargetDowned = nil
-
 			if Humanoid:GetAttribute("Carrying") then
+				ButtonUI.Visible = true
 				ButtonUI.CarryButton.Visible = false
 				ButtonUI.ReviveButton.Visible = false
 				ButtonUI.DropButton.Visible = true
-				ButtonUI.Visible = true
 			else
 				ButtonUI.Visible = false
 			end
-
-			highlightedChar = nil
 		end
 	end
 end
