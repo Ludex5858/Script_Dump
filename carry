@@ -84,11 +84,8 @@ local function RevivePressed()
             task.spawn(function()
                 while task.wait(0.1) do
                     local shouldCancel = not ReviveTarget
-                        or (HumanoidRootPart.Position - ReviveTarget.HumanoidRootPart.Position).Magnitude > 8
                         or not ReviveTarget.Humanoid:GetAttribute("BeingRevived")
                         or not ReviveTarget.Humanoid:GetAttribute("Downed")
-                        or Humanoid:GetAttribute("Downed")
-                        or Humanoid:GetAttribute("Ragdolled")
                         or Humanoid:GetState() == Enum.HumanoidStateType.Dead
 
                     if shouldCancel then
@@ -120,7 +117,7 @@ local function CarryPressed()
     if not carryDebounce then
         if TargetDowned then
             carryDebounce = true
-            task.delay(1, function()
+            task.delay(0.2, function()
                 carryDebounce = false
             end)
             CarryAnotherPlayer:FireServer(TargetDowned)
@@ -129,7 +126,7 @@ local function CarryPressed()
         end
         if Humanoid:GetAttribute("Carrying") then
             carryDebounce = true
-            task.delay(1, function()
+            task.delay(0.2, function()
                 carryDebounce = false
             end)
             CarryAnotherPlayer:FireServer()
@@ -159,7 +156,7 @@ while task.wait(0.2) do
             if other ~= Character and other:FindFirstChild("HumanoidRootPart") then
                 local dist = (HumanoidRootPart.Position - other.HumanoidRootPart.Position).Magnitude
                 local otherHumanoid = other:FindFirstChild("Humanoid")
-                if dist < closestDist and dist <= 8 and otherHumanoid
+                if dist < closestDist and dist <= 16 and otherHumanoid
                     and otherHumanoid:GetState() ~= Enum.HumanoidStateType.Dead
                     and not (otherHumanoid:GetAttribute("Carried") or otherHumanoid:GetAttribute("Ragdolled")) then
                     closest = other
