@@ -1,0 +1,41 @@
+local s=workspace:FindFirstChild("SHS")or Instance.new("BoolValue")
+s.Name="SHS"
+s.Parent=workspace
+local on={}
+local r=true
+local function tp(i)while i.Parent and i.Parent~=workspace do i=i.Parent end return i.Parent==workspace and i or nil end
+local function hl(it)
+if on[it]then return end
+local h=Instance.new("Highlight")
+h.FillColor=Color3.new(1,1,0)
+h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+h.Parent=it
+local p=it:IsA("BasePart")and it or it:FindFirstChildWhichIsA("BasePart")
+local t
+if p then
+t=Instance.new("BillboardGui",p)
+t.Size=UDim2.new(0,100,0,30)
+t.StudsOffset=Vector3.new(0,2,0)
+t.AlwaysOnTop=true
+t.Adornee=p
+local l=Instance.new("TextLabel",t)
+l.Size=UDim2.new(1,0,1,0)
+l.BackgroundTransparency=1
+l.Text=it.Name
+l.TextColor3=Color3.new(1,1,1)
+l.TextScaled=true
+end
+on[it]={h,t}
+it.AncestryChanged:Connect(function(_,pa)if not pa then on[it]=nil end end)
+end
+local function ck(d)if r and d.Name=="DropPrompt"and d:IsA("ProximityPrompt")then local t=tp(d)if t then hl(t)end end end
+for _,d in ipairs(workspace:GetDescendants())do ck(d)end
+local cn=workspace.DescendantAdded:Connect(ck)
+s.Changed:Connect(function(v)
+if not v then return end
+s.Value=false
+r=false
+cn:Disconnect()
+for _,o in pairs(on)do for _,x in ipairs(o)do if x then x:Destroy()end end end
+on={}
+end)
