@@ -1,79 +1,52 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
+local CollectibleStream = ReplicatedStorage:WaitForChild("MogOrDie"):WaitForChild("CollectibleStream")
 
-local function createTextBox()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "CollectibleTest"
-    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-    screenGui.ResetOnSpawn = false
-    
-    local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(0, 600, 0, 400)
-    textBox.Position = UDim2.new(0.5, -300, 0.5, -200)
-    textBox.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
-    textBox.TextColor3 = Color3.fromRGB(200, 200, 220)
-    textBox.Font = Enum.Font.Code
-    textBox.TextSize = 12
-    textBox.Text = "Testing..."
-    textBox.TextXAlignment = Enum.TextXAlignment.Left
-    textBox.TextYAlignment = Enum.TextYAlignment.Top
-    textBox.TextWrapped = true
-    textBox.MultiLine = true
-    textBox.ClearTextOnFocus = false
-    textBox.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = textBox
-    
-    return screenGui, textBox
-end
+local collectedIds = {}
+local collectibleTable = nil
 
-local screenGui, textBox = createTextBox()
-local results = {}
-
-local function addResult(text)
-    table.insert(results, text)
-    textBox.Text = table.concat(results, "\n")
-end
-
-local function findAllCollectibles()
-    local found = {}
-    local total = 0
+local function getCollectibleTable()
+    if collectibleTable then return collectibleTable end
     
-    local success, env = pcall(function()
-        return getfenv(0)
+    local success, result = pcall(function()
+        local env = getfenv(0)
+        if env and env.collectibles then
+            return env.collectibles
+        end
+        if env and env.v_u_46 then
+            return env.v_u_46
+        end
+        if _G.collectibles then
+            return _G.collectibles
+        end
+        return nil
     end)
-    if success and env then
-        if env.collectibles then
-            for id, record in pairs(env.collectibles) do
-                if type(record) == "table" then
-                    total = total + 1
-                    found[id] = true
-                end
-            end
-        end
-        if env.v_u_46 then
-            for id, record in pairs(env.v_u_46) do
-                if type(record) == "table" then
-                    total = total + 1
-                    found[id] = true
-                end
-            end
-        end
+    
+    if success and result then
+        collectibleTable = result
+        return collectibleTable
     end
     
-    local success, global = pcall(function()
-        return _G.collectibles
-    end)
-    if success and global then
-        for id, record in pairs(global) do
-            if type(record) == "table" then
-                total = total + 1
-                found[id] = true
+    return nil
+end
+
+local function collectItem(id)
+    if collectedIds[id] then return end
+    collectedIds[id] = true
+    CollectibleStream:FireServer("collect", id)
+end
+
+local function collectAll()
+    local table = getCollectibleTable()
+    if table then
+        for id, record in pairs(table) do
+            if type(record) == "table" and not collectedIds[id] then
+                collectItem(id)
+                task.wait(0.01)
             end
         end
     end
@@ -83,129 +56,15 @@ local function findAllCollectibles()
         for _, child in pairs(clientCollectibles:GetDescendants()) do
             if child:IsA("Model") or child:IsA("BasePart") then
                 local id = child:GetAttribute("CollectibleId") or child.Name
-                if id and id ~= "" then
-                    total = total + 1
-                    found[id] = true
+                if id and id ~= "" and not collectedIds[id] then
+                    collectItem(id)
+                    task.wait(0.01)
                 end
             end
         end
     end
-    
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Model") or v:IsA("BasePart") then
-            local id = v:GetAttribute("CollectibleId") or v.Name
-            if id and id ~= "" and not string.match(id, "Part") and not string.match(id, "Base") then
-                total = total + 1
-                found[id] = true
-            end
-        end
-    end
-    
-    return found, total
 end
 
-local function getCollectibleIds()
-    local found, total = findAllCollectibles()
-    local ids = {}
-    for id, _ in pairs(found) do
-        table.insert(ids, id)
-    end
-    return ids, total
+while wait(0.5) do
+    collectAll()
 end
-
-local function startTest()
-    addResult("=== COLLECTIBLE TEST RESULTS ===")
-    task.wait(0.1)
-    
-    addResult("")
-    addResult("1. Finding collectibles...")
-    local ids, total = getCollectibleIds()
-    addResult("   Total collectibles found: " .. total)
-    addResult("   Unique IDs: " .. #ids)
-    task.wait(0.1)
-    
-    addResult("")
-    addResult("2. Sample IDs (first 5):")
-    for i = 1, math.min(5, #ids) do
-        addResult("   " .. ids[i])
-    end
-    if #ids > 5 then
-        addResult("   ... and " .. (#ids - 5) .. " more")
-    end
-    task.wait(0.1)
-    
-    addResult("")
-    addResult("3. Checking remote event...")
-    local mogOrDie = ReplicatedStorage:FindFirstChild("MogOrDie")
-    if mogOrDie then
-        local stream = mogOrDie:FindFirstChild("CollectibleStream")
-        if stream then
-            addResult("   ✓ CollectibleStream found")
-            addResult("")
-            addResult("4. Testing FireServer with first ID...")
-            if #ids > 0 then
-                local success, err = pcall(function()
-                    stream:FireServer("collect", ids[1])
-                end)
-                if success then
-                    addResult("   ✓ FireServer succeeded for: " .. ids[1])
-                else
-                    addResult("   ✗ FireServer failed: " .. tostring(err))
-                end
-                
-                task.wait(0.1)
-                
-                local success, err = pcall(function()
-                    stream:FireServer("collect", tonumber(ids[1]))
-                end)
-                if success then
-                    addResult("   ✓ FireServer with number worked: " .. ids[1])
-                else
-                    addResult("   ✗ FireServer with number failed: " .. tostring(err))
-                end
-            else
-                addResult("   ✗ No IDs to test with")
-            end
-        else
-            addResult("   ✗ CollectibleStream not found")
-        end
-    else
-        addResult("   ✗ MogOrDie not found")
-    end
-    
-    addResult("")
-    addResult("5. Testing position data...")
-    local hasPosition = false
-    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
-    if clientCollectibles then
-        for _, child in pairs(clientCollectibles:GetDescendants()) do
-            if child:IsA("Model") or child:IsA("BasePart") then
-                local pos
-                if child:IsA("Model") then
-                    local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
-                    if root then pos = root.Position end
-                    if not pos then pos = child:GetPivot().Position end
-                else
-                    pos = child.Position
-                end
-                if pos then
-                    hasPosition = true
-                    break
-                end
-            end
-        end
-    end
-    if hasPosition then
-        addResult("   ✓ Position data available from workspace")
-    else
-        addResult("   ✗ No position data found in workspace")
-    end
-    
-    addResult("")
-    addResult("=== TEST COMPLETE ===")
-    addResult("")
-    addResult("Copy all text above and paste it back")
-    addResult("========================================")
-end
-
-task.spawn(startTest)
