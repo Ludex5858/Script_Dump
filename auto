@@ -1,107 +1,50 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local MogOrDie = ReplicatedStorage:WaitForChild("MogOrDie")
-local CollectibleStream = MogOrDie:WaitForChild("CollectibleStream")
+local CollectibleStream = ReplicatedStorage:WaitForChild("MogOrDie"):WaitForChild("CollectibleStream")
 
-local COLLECT_RADIUS = 5000
-local AUTO_COOLDOWN = 0.1
-local STOP_AUTO_NAME = "StopAuto"
+local COLLECT_RADIUS = 999999
+local AUTO_COOLDOWN = 0.01
 
-local StopAuto = LocalPlayer:FindFirstChild(STOP_AUTO_NAME)
-if not StopAuto then
-    StopAuto = Instance.new("BoolValue")
-    StopAuto.Name = STOP_AUTO_NAME
-    StopAuto.Value = false
-    StopAuto.Parent = LocalPlayer
-end
-
-local lastFireTimes = {}
 local collectedIds = {}
 
 local function collectItem(id)
-    if collectedIds[id] then
-        return
-    end
-    
-    local success, err = pcall(function()
-        CollectibleStream:FireServer("collect", id)
-    end)
-    
-    if success then
-        collectedIds[id] = true
-        task.delay(5, function()
-            collectedIds[id] = nil
-        end)
-    end
+    if collectedIds[id] then return end
+    collectedIds[id] = true
+    CollectibleStream:FireServer("collect", id)
+    task.wait(0.005)
 end
 
-RunService.RenderStepped:Connect(function()
-    if StopAuto.Value then
-        return
-    end
+local function getAllCollectibles()
+    local found = {}
     
-    local character = LocalPlayer.Character
-    local rootPart = character and character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then
-        return
-    end
-    
-    local playerPos = rootPart.Position
-    local currentTime = os.clock()
-    
-    local success, collectibleTable = pcall(function()
-        return getfenv(0) and getfenv(0).collectibles
-    end)
-    
-    if not success or not collectibleTable then
-        local workspaceCollectibles = workspace:FindFirstChild("ClientCollectibles")
-        if workspaceCollectibles then
-            for _, child in pairs(workspaceCollectibles:GetChildren()) do
-                if child:IsA("Model") or child:IsA("Part") then
-                    local distance = (child.Position - playerPos).Magnitude
-                    if distance <= COLLECT_RADIUS then
-                        local id = child:GetAttribute("CollectibleId") or child.Name
-                        if id and not collectedIds[id] then
-                            local lastFire = lastFireTimes[id] or 0
-                            if currentTime - lastFire >= AUTO_COOLDOWN then
-                                lastFireTimes[id] = currentTime
-                                collectItem(id)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-        return
-    end
-    
-    for id, record in pairs(collectibleTable) do
-        if record and record.Position then
-            local position = record.Position
-            local distance = (position - playerPos).Magnitude
-            
-            if distance <= COLLECT_RADIUS and not collectedIds[id] then
-                local lastFire = lastFireTimes[id] or 0
-                if currentTime - lastFire >= AUTO_COOLDOWN then
-                    lastFireTimes[id] = currentTime
+    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
+    if clientCollectibles then
+        for _, child in pairs(clientCollectibles:GetDescendants()) do
+            if child:IsA("Model") or child:IsA("Part") or child:IsA("Folder") then
+                local id = child:GetAttribute("CollectibleId") or child.Name
+                if id and id ~= "" and not found[id] then
+                    found[id] = true
                     collectItem(id)
                 end
             end
         end
     end
-end)
-
-local function handleDiamondFrenzy()
-    local ownerId = tonumber(LocalPlayer:GetAttribute("TutorialDiamondFrenzyOwnerUserId")) or 0
-    if ownerId == LocalPlayer.UserId then
-        AUTO_COOLDOWN = 0.05
-    else
-        AUTO_COOLDOWN = 0.1
+    
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") or v:IsA("Part") then
+            local id = v:GetAttribute("CollectibleId") or v.Name
+            if id and id ~= "" and not found[id] then
+                found[id] = true
+                collectItem(id)
+            end
+        end
     end
 end
 
-LocalPlayer:GetAttributeChangedSignal("TutorialDiamondFrenzyOwnerUserId"):Connect(handleDiamondFrenzy)
-handleDiamondFrenzy()
+while wait(0.5) do
+    getAllCollectibles()
+end
