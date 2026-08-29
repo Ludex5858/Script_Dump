@@ -1,159 +1,66 @@
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local LocalPlayer = Players.LocalPlayer
-local CollectibleStream = ReplicatedStorage:FindFirstChild("MogOrDie")
-if CollectibleStream then
-    CollectibleStream = CollectibleStream:FindFirstChild("CollectibleStream")
-end
 
-if not CollectibleStream then
-    warn("CollectibleStream not found!")
-    return
-end
+print("=== TELEPORT COLLECTOR STARTED ===")
 
-local collectedIds = {}
-local collectibleTable = nil
-
-local function getCollectibleTable()
-    if collectibleTable then return collectibleTable end
-    
-    local env = getfenv(0)
-    if env then
-        if env.v_u_46 then
-            collectibleTable = env.v_u_46
-            return collectibleTable
-        end
-        if env.collectibles then
-            collectibleTable = env.collectibles
-            return collectibleTable
-        end
-    end
-    
-    if _G.collectibles then
-        collectibleTable = _G.collectibles
-        return collectibleTable
-    end
-    
-    return nil
-end
-
-local function getPositionFromId(id)
-    local table = getCollectibleTable()
-    if table and table[id] then
-        local record = table[id]
-        if record and record.Position then
-            return record.Position
-        end
-    end
-    
-    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
-    if clientCollectibles then
-        for _, child in pairs(clientCollectibles:GetDescendants()) do
-            if child:IsA("Model") or child:IsA("BasePart") then
-                local cid = child:GetAttribute("CollectibleId") or child.Name
-                if cid == id then
-                    if child:IsA("Model") then
-                        local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
-                        if root then return root.Position end
-                        return child:GetPivot().Position
-                    else
-                        return child.Position
-                    end
-                end
-            end
-        end
-    end
-    
-    return nil
-end
-
-local function collectItem(id)
-    if collectedIds[id] then return end
-    collectedIds[id] = true
-    CollectibleStream:FireServer("collect", id)
-end
-
-local function teleportTo(position)
+while wait(0.5) do
     local character = LocalPlayer.Character
-    if not character then return end
+    if not character then 
+        print("No character found")
+        continue 
+    end
     
     local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then
-        humanoid:ChangeState(Enum.HumanoidStateType.Landed)
-        humanoid.AutoRotate = false
+    if not rootPart then 
+        print("No HumanoidRootPart found")
+        continue 
     end
-    
-    rootPart.CFrame = CFrame.new(position)
-    
-    if humanoid then
-        humanoid.AutoRotate = true
-    end
-end
-
-local function findAndCollect()
-    local character = LocalPlayer.Character
-    if not character then return end
-    
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
     
     local currentPos = rootPart.Position
+    print("Current position:", currentPos)
+    
+    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
+    if not clientCollectibles then
+        print("ClientCollectibles not found in workspace")
+        continue
+    end
+    
     local closest = nil
     local closestDist = 999999
     
-    local table = getCollectibleTable()
-    if table then
-        for id, record in pairs(table) do
-            if type(record) == "table" and record.Position and not collectedIds[id] then
-                local pos = record.Position
-                if pos then
-                    local dist = (pos - currentPos).Magnitude
-                    if dist < closestDist then
-                        closestDist = dist
-                        closest = {id = id, pos = pos}
-                    end
+    for _, child in pairs(clientCollectibles:GetDescendants()) do
+        if child:IsA("Model") or child:IsA("BasePart") then
+            local pos = nil
+            
+            if child:IsA("Model") then
+                local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
+                if root then 
+                    pos = root.Position
+                else
+                    pos = child:GetPivot().Position
                 end
+            else
+                pos = child.Position
             end
-        end
-    end
-    
-    if not closest then
-        local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
-        if clientCollectibles then
-            for _, child in pairs(clientCollectibles:GetDescendants()) do
-                if child:IsA("Model") or child:IsA("BasePart") then
-                    local id = child:GetAttribute("CollectibleId") or child.Name
-                    if id and id ~= "" and not collectedIds[id] then
-                        local pos = getPositionFromId(id)
-                        if pos then
-                            local dist = (pos - currentPos).Magnitude
-                            if dist < closestDist then
-                                closestDist = dist
-                                closest = {id = id, pos = pos}
-                            end
-                        end
-                    end
+            
+            if pos then
+                local dist = (pos - currentPos).Magnitude
+                if dist < closestDist and dist > 2 then
+                    closestDist = dist
+                    closest = {obj = child, pos = pos}
+                    print("Found collectible at distance:", dist, "Position:", pos)
                 end
             end
         end
     end
     
     if closest then
-        local targetPos = closest.pos + Vector3.new(0, 5, 0)
-        teleportTo(targetPos)
-        task.wait(0.05)
-        collectItem(closest.id)
-        task.wait(0.05)
+        print("Teleporting to:", closest.pos)
+        rootPart.CFrame = CFrame.new(closest.pos + Vector3.new(0, 5, 0))
+        print("Teleported!")
+    else
+        print("No collectibles found nearby")
     end
-end
-
-print("Auto Collect with Teleport Started!")
-
-while wait(0.05) do
-    findAndCollect()
 end
