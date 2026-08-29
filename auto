@@ -1,131 +1,48 @@
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 
-local function createGUI()
+local function createTextBox()
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "CollectibleTester"
+    screenGui.Name = "CollectibleTest"
     screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     screenGui.ResetOnSpawn = false
     
-    local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 700, 0, 500)
-    mainFrame.Position = UDim2.new(0.5, -350, 0.5, -250)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.BackgroundTransparency = 0.1
-    mainFrame.Parent = screenGui
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
-    
-    local blur = Instance.new("BlurEffect")
-    blur.Size = 10
-    blur.Parent = mainFrame
-    
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, 0, 0, 40)
-    title.Position = UDim2.new(0, 0, 0, 0)
-    title.Text = "Collectible Tester - Results"
-    title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 20
-    title.Parent = mainFrame
-    
-    local statusText = Instance.new("TextLabel")
-    statusText.Size = UDim2.new(1, -20, 0, 30)
-    statusText.Position = UDim2.new(0, 10, 0, 45)
-    statusText.Text = "Status: Testing..."
-    statusText.TextColor3 = Color3.fromRGB(255, 200, 100)
-    statusText.BackgroundTransparency = 1
-    statusText.Font = Enum.Font.Gotham
-    statusText.TextSize = 14
-    statusText.TextXAlignment = Enum.TextXAlignment.Left
-    statusText.Parent = mainFrame
-    
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(1, -20, 1, -95)
-    textBox.Position = UDim2.new(0, 10, 0, 80)
-    textBox.BackgroundColor3 = Color3.fromRGB(8, 8, 18)
-    textBox.BorderSizePixel = 0
+    textBox.Size = UDim2.new(0, 600, 0, 400)
+    textBox.Position = UDim2.new(0.5, -300, 0.5, -200)
+    textBox.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
     textBox.TextColor3 = Color3.fromRGB(200, 200, 220)
     textBox.Font = Enum.Font.Code
-    textBox.TextSize = 13
-    textBox.Text = "Waiting for results..."
+    textBox.TextSize = 12
+    textBox.Text = "Testing..."
     textBox.TextXAlignment = Enum.TextXAlignment.Left
     textBox.TextYAlignment = Enum.TextYAlignment.Top
     textBox.TextWrapped = true
-    textBox.ClearTextOnFocus = false
     textBox.MultiLine = true
-    textBox.Parent = mainFrame
+    textBox.ClearTextOnFocus = false
+    textBox.Parent = screenGui
     
-    local corner2 = Instance.new("UICorner")
-    corner2.CornerRadius = UDim.new(0, 8)
-    corner2.Parent = textBox
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = textBox
     
-    local copyButton = Instance.new("TextButton")
-    copyButton.Size = UDim2.new(0, 120, 0, 35)
-    copyButton.Position = UDim2.new(1, -130, 1, -45)
-    copyButton.Text = "Copy Results"
-    copyButton.BackgroundColor3 = Color3.fromRGB(40, 40, 70)
-    copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    copyButton.Font = Enum.Font.GothamSemibold
-    copyButton.TextSize = 15
-    copyButton.Parent = mainFrame
-    
-    local corner3 = Instance.new("UICorner")
-    corner3.CornerRadius = UDim.new(0, 6)
-    corner3.Parent = copyButton
-    
-    local closeButton = Instance.new("TextButton")
-    closeButton.Size = UDim2.new(0, 60, 0, 30)
-    closeButton.Position = UDim2.new(0, 10, 1, -40)
-    closeButton.Text = "Close"
-    closeButton.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeButton.Font = Enum.Font.Gotham
-    closeButton.TextSize = 14
-    closeButton.Parent = mainFrame
-    
-    local corner4 = Instance.new("UICorner")
-    corner4.CornerRadius = UDim.new(0, 6)
-    corner4.Parent = closeButton
-    
-    return screenGui, statusText, textBox, copyButton, closeButton
+    return screenGui, textBox
 end
 
-local screenGui, statusText, textBox, copyButton, closeButton = createGUI()
+local screenGui, textBox = createTextBox()
 local results = {}
 
-local function addResult(text, color)
-    local colorStr = ""
-    if color then
-        colorStr = string.format("%.3f, %.3f, %.3f", color.R, color.G, color.B)
-    end
+local function addResult(text)
     table.insert(results, text)
     textBox.Text = table.concat(results, "\n")
-    textBox.CursorPosition = -1
-end
-
-local function testMethod(name, func)
-    addResult("--- " .. name .. " ---")
-    local success, err = pcall(func)
-    if success then
-        addResult("✓ " .. name .. " - SUCCESS")
-    else
-        addResult("✗ " .. name .. " - FAILED: " .. tostring(err))
-    end
-    task.wait(0.05)
 end
 
 local function findAllCollectibles()
-    local results = {}
+    local found = {}
+    local total = 0
     
     local success, env = pcall(function()
         return getfenv(0)
@@ -134,14 +51,16 @@ local function findAllCollectibles()
         if env.collectibles then
             for id, record in pairs(env.collectibles) do
                 if type(record) == "table" then
-                    table.insert(results, {id = id, data = record, source = "getfenv(0).collectibles"})
+                    total = total + 1
+                    found[id] = true
                 end
             end
         end
         if env.v_u_46 then
             for id, record in pairs(env.v_u_46) do
                 if type(record) == "table" then
-                    table.insert(results, {id = id, data = record, source = "getfenv(0).v_u_46"})
+                    total = total + 1
+                    found[id] = true
                 end
             end
         end
@@ -153,7 +72,8 @@ local function findAllCollectibles()
     if success and global then
         for id, record in pairs(global) do
             if type(record) == "table" then
-                table.insert(results, {id = id, data = record, source = "_G.collectibles"})
+                total = total + 1
+                found[id] = true
             end
         end
     end
@@ -164,15 +84,8 @@ local function findAllCollectibles()
             if child:IsA("Model") or child:IsA("BasePart") then
                 local id = child:GetAttribute("CollectibleId") or child.Name
                 if id and id ~= "" then
-                    local pos
-                    if child:IsA("Model") then
-                        local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
-                        if root then pos = root.Position end
-                        if not pos then pos = child:GetPivot().Position end
-                    else
-                        pos = child.Position
-                    end
-                    table.insert(results, {id = id, data = {Position = pos}, source = "Workspace.ClientCollectibles"})
+                    total = total + 1
+                    found[id] = true
                 end
             end
         end
@@ -182,216 +95,117 @@ local function findAllCollectibles()
         if v:IsA("Model") or v:IsA("BasePart") then
             local id = v:GetAttribute("CollectibleId") or v.Name
             if id and id ~= "" and not string.match(id, "Part") and not string.match(id, "Base") then
-                local pos
-                if v:IsA("Model") then
-                    local root = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Head") or v:FindFirstChild("Torso")
-                    if root then pos = root.Position end
-                    if not pos then pos = v:GetPivot().Position end
-                else
-                    pos = v.Position
-                end
-                if pos then
-                    table.insert(results, {id = id, data = {Position = pos}, source = "Workspace.Full"})
-                end
+                total = total + 1
+                found[id] = true
             end
         end
     end
     
-    return results
+    return found, total
 end
 
-local function testRemoteEvents()
-    local mogOrDie = ReplicatedStorage:FindFirstChild("MogOrDie")
-    if not mogOrDie then return nil end
-    
-    local collectibleStream = mogOrDie:FindFirstChild("CollectibleStream")
-    if collectibleStream then
-        addResult("✓ Found CollectibleStream remote event")
-        return collectibleStream
+local function getCollectibleIds()
+    local found, total = findAllCollectibles()
+    local ids = {}
+    for id, _ in pairs(found) do
+        table.insert(ids, id)
     end
-    addResult("✗ CollectibleStream not found")
-    return nil
+    return ids, total
 end
 
-local function testFireServerMethods()
-    local stream = testRemoteEvents()
-    if not stream then return end
-    
-    local ids = findAllCollectibles()
-    if #ids == 0 then
-        addResult("✗ No collectibles found to test with")
-        return
-    end
-    
-    local testId = ids[1].id
-    addResult("Testing FireServer with ID: " .. tostring(testId))
-    
-    local success, err = pcall(function()
-        stream:FireServer("collect", testId)
-    end)
-    if success then
-        addResult("✓ FireServer succeeded for ID: " .. tostring(testId))
-    else
-        addResult("✗ FireServer failed: " .. tostring(err))
-    end
-    
+local function startTest()
+    addResult("=== COLLECTIBLE TEST RESULTS ===")
     task.wait(0.1)
     
-    local success, err = pcall(function()
-        stream:FireServer("collect", tonumber(testId))
-    end)
-    if success then
-        addResult("✓ FireServer with number worked: " .. tostring(testId))
-    else
-        addResult("✗ FireServer with number failed: " .. tostring(err))
+    addResult("")
+    addResult("1. Finding collectibles...")
+    local ids, total = getCollectibleIds()
+    addResult("   Total collectibles found: " .. total)
+    addResult("   Unique IDs: " .. #ids)
+    task.wait(0.1)
+    
+    addResult("")
+    addResult("2. Sample IDs (first 5):")
+    for i = 1, math.min(5, #ids) do
+        addResult("   " .. ids[i])
     end
-end
-
-local function testGetAllIds()
-    local ids = findAllCollectibles()
-    addResult("Found " .. #ids .. " total collectible entries")
-    
-    local idMap = {}
-    for _, item in pairs(ids) do
-        if not idMap[item.id] then
-            idMap[item.id] = 0
-        end
-        idMap[item.id] = idMap[item.id] + 1
+    if #ids > 5 then
+        addResult("   ... and " .. (#ids - 5) .. " more")
     end
+    task.wait(0.1)
     
-    addResult("Unique IDs: " .. #idMap)
-    
-    local sampleIds = {}
-    local count = 0
-    for id, _ in pairs(idMap) do
-        if count < 10 then
-            table.insert(sampleIds, id)
-            count = count + 1
-        end
-    end
-    
-    addResult("Sample IDs: " .. table.concat(sampleIds, ", "))
-end
-
-local function testTeleportCollect()
-    local character = LocalPlayer.Character
-    if not character then 
-        addResult("✗ No character found")
-        return 
-    end
-    
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root then 
-        addResult("✗ No HumanoidRootPart found")
-        return 
-    end
-    
-    local ids = findAllCollectibles()
-    local found = false
-    
-    for _, item in pairs(ids) do
-        if item.data and item.data.Position then
-            local pos = item.data.Position
-            if type(pos) == "Vector3" then
-                local tween = TweenService:Create(root, TweenInfo.new(0.1), {CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))})
-                tween:Play()
-                tween.Completed:Wait()
-                addResult("✓ Teleported to position: " .. tostring(pos))
-                found = true
-                break
+    addResult("")
+    addResult("3. Checking remote event...")
+    local mogOrDie = ReplicatedStorage:FindFirstChild("MogOrDie")
+    if mogOrDie then
+        local stream = mogOrDie:FindFirstChild("CollectibleStream")
+        if stream then
+            addResult("   ✓ CollectibleStream found")
+            addResult("")
+            addResult("4. Testing FireServer with first ID...")
+            if #ids > 0 then
+                local success, err = pcall(function()
+                    stream:FireServer("collect", ids[1])
+                end)
+                if success then
+                    addResult("   ✓ FireServer succeeded for: " .. ids[1])
+                else
+                    addResult("   ✗ FireServer failed: " .. tostring(err))
+                end
+                
+                task.wait(0.1)
+                
+                local success, err = pcall(function()
+                    stream:FireServer("collect", tonumber(ids[1]))
+                end)
+                if success then
+                    addResult("   ✓ FireServer with number worked: " .. ids[1])
+                else
+                    addResult("   ✗ FireServer with number failed: " .. tostring(err))
+                end
+            else
+                addResult("   ✗ No IDs to test with")
             end
+        else
+            addResult("   ✗ CollectibleStream not found")
         end
+    else
+        addResult("   ✗ MogOrDie not found")
     end
     
-    if not found then
-        addResult("✗ No valid position found to teleport to")
-    end
-end
-
-local function testCollectNearby()
-    local character = LocalPlayer.Character
-    if not character then 
-        addResult("✗ No character found")
-        return 
-    end
-    
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root then 
-        addResult("✗ No HumanoidRootPart found")
-        return 
-    end
-    
-    local stream = testRemoteEvents()
-    if not stream then return end
-    
-    local ids = findAllCollectibles()
-    local count = 0
-    
-    for _, item in pairs(ids) do
-        if item.data and item.data.Position then
-            local pos = item.data.Position
-            if type(pos) == "Vector3" then
-                local dist = (pos - root.Position).Magnitude
-                if dist < 100 then
-                    stream:FireServer("collect", item.id)
-                    count = count + 1
-                    task.wait(0.01)
+    addResult("")
+    addResult("5. Testing position data...")
+    local hasPosition = false
+    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
+    if clientCollectibles then
+        for _, child in pairs(clientCollectibles:GetDescendants()) do
+            if child:IsA("Model") or child:IsA("BasePart") then
+                local pos
+                if child:IsA("Model") then
+                    local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
+                    if root then pos = root.Position end
+                    if not pos then pos = child:GetPivot().Position end
+                else
+                    pos = child.Position
+                end
+                if pos then
+                    hasPosition = true
+                    break
                 end
             end
         end
     end
-    
-    addResult("Attempted to collect " .. count .. " nearby items")
-end
-
-local function startTesting()
-    statusText.Text = "Status: Testing in progress..."
-    addResult("========================================")
-    addResult("COLLECTIBLE TESTER RESULTS")
-    addResult("========================================")
-    task.wait(0.3)
-    
-    testMethod("Find All Collectibles", function()
-        local ids = findAllCollectibles()
-        addResult("Found " .. #ids .. " total collectible entries")
-        return true
-    end)
-    
-    testMethod("Remote Event", function()
-        return testRemoteEvents() ~= nil
-    end)
-    
-    testMethod("FireServer Methods", testFireServerMethods)
-    testMethod("Get All IDs", testGetAllIds)
-    testMethod("Teleport to Collectible", testTeleportCollect)
-    testMethod("Collect Nearby", testCollectNearby)
-    
-    addResult("========================================")
-    addResult("TESTING COMPLETE")
-    addResult("========================================")
-    addResult("Copy these results and paste them back")
-    addResult("to get the final working script")
-    addResult("========================================")
-    
-    statusText.Text = "Status: Testing complete! Select all text to copy."
-end
-
-copyButton.MouseButton1Click:Connect(function()
-    if setclipboard then
-        setclipboard(textBox.Text)
-        statusText.Text = "Status: Copied to clipboard!"
-        task.delay(2, function()
-            statusText.Text = "Status: Testing complete! Select all text to copy."
-        end)
+    if hasPosition then
+        addResult("   ✓ Position data available from workspace")
     else
-        statusText.Text = "Status: Select text and press Ctrl+C to copy"
+        addResult("   ✗ No position data found in workspace")
     end
-    textBox:CaptureFocus()
-    textBox.CursorPosition = -1
-end)
+    
+    addResult("")
+    addResult("=== TEST COMPLETE ===")
+    addResult("")
+    addResult("Copy all text above and paste it back")
+    addResult("========================================")
+end
 
-closeButton.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
-task.spawn(startTesting)
+task.spawn(startTest)
