@@ -1,0 +1,5 @@
+local P=game:GetService("Players")
+local function setup(c)local v=c:WaitForChild("Impostor",5)if not v then return end local function u()local hl=c:FindFirstChild("Highlight")if v.Value then if not hl then hl=Instance.new("Highlight")hl.FillColor=Color3.new(1,0,0)hl.OutlineColor=Color3.new(1,0,0)hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop hl.Parent=c end elseif hl then hl:Destroy()end end u()v.Changed:Connect(u)end
+local function h(p)p.CharacterAdded:Connect(setup)if p.Character then setup(p.Character)end end
+for _,p in ipairs(P:GetPlayers())do h(p)end
+P.PlayerAdded:Connect(h)
