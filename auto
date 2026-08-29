@@ -13,69 +13,31 @@ local AUTO_COOLDOWN = 0.01
 local MIN_DISTANCE = 3
 
 local collectedIds = {}
-local collectibleTable = nil
 
-local function getCollectibleTable()
-    if collectibleTable then return collectibleTable end
-    
-    local success, result = pcall(function()
-        local env = getfenv(0)
-        if env and env.collectibles then
-            return env.collectibles
+local function getPosition(obj)
+    if obj:IsA("Model") then
+        local root = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj:FindFirstChild("Torso")
+        if root then
+            return root.Position
         end
-        local script = debug and debug.getinfo(1, "S").source
-        if script then
-            for i = 1, 10 do
-                local func = debug.getinfo(i, "f")
-                if func and func.func then
-                    local env2 = getfenv(func.func)
-                    if env2 and env2.collectibles then
-                        return env2.collectibles
-                    end
-                end
+        local parts = {}
+        for _, v in pairs(obj:GetDescendants()) do
+            if v:IsA("BasePart") then
+                table.insert(parts, v)
             end
         end
-        return nil
-    end)
-    
-    if success and result then
-        collectibleTable = result
-        return collectibleTable
-    end
-    
-    return nil
-end
-
-local function getPositionFromId(id)
-    local table = getCollectibleTable()
-    if table and table[id] then
-        local record = table[id]
-        if record then
-            if type(record) == "table" and record.Position then
-                return record.Position
+        if #parts > 0 then
+            local sum = Vector3.new(0, 0, 0)
+            for _, v in pairs(parts) do
+                sum = sum + v.Position
             end
+            return sum / #parts
         end
+        return obj:GetPivot().Position
+    elseif obj:IsA("BasePart") then
+        return obj.Position
     end
-    
-    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
-    if clientCollectibles then
-        for _, child in pairs(clientCollectibles:GetDescendants()) do
-            if child:IsA("Model") or child:IsA("BasePart") then
-                local cid = child:GetAttribute("CollectibleId") or child.Name
-                if cid == id then
-                    if child:IsA("Model") then
-                        local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
-                        if root then return root.Position end
-                        return child:GetPivot().Position
-                    else
-                        return child.Position
-                    end
-                end
-            end
-        end
-    end
-    
-    return nil
+    return Vector3.new(0, 0, 0)
 end
 
 local function collectItem(id)
@@ -85,16 +47,9 @@ local function collectItem(id)
     task.wait(0.005)
 end
 
-local function getAllCollectibleIds()
-    local ids = {}
-    local table = getCollectibleTable()
-    if table then
-        for id, record in pairs(table) do
-            if record and type(record) == "table" and record.Position then
-                table.insert(ids, {id = id, position = record.Position})
-            end
-        end
-    end
+local function getClosestCollectible(pos)
+    local closest = nil
+    local closestDist = TELEPORT_RADIUS
     
     local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
     if clientCollectibles then
@@ -102,36 +57,27 @@ local function getAllCollectibleIds()
             if child:IsA("Model") or child:IsA("BasePart") then
                 local id = child:GetAttribute("CollectibleId") or child.Name
                 if id and id ~= "" and not collectedIds[id] then
-                    local pos
-                    if child:IsA("Model") then
-                        local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
-                        if root then pos = root.Position end
-                        if not pos then pos = child:GetPivot().Position end
-                    else
-                        pos = child.Position
-                    end
-                    if pos then
-                        table.insert(ids, {id = id, position = pos})
+                    local itemPos = getPosition(child)
+                    local dist = (itemPos - pos).Magnitude
+                    if dist < closestDist and dist > MIN_DISTANCE then
+                        closestDist = dist
+                        closest = child
                     end
                 end
             end
         end
     end
     
-    return ids
-end
-
-local function getClosestCollectible(pos)
-    local ids = getAllCollectibleIds()
-    local closest = nil
-    local closestDist = TELEPORT_RADIUS
-    
-    for _, item in pairs(ids) do
-        if not collectedIds[item.id] then
-            local dist = (item.position - pos).Magnitude
-            if dist < closestDist and dist > MIN_DISTANCE then
-                closestDist = dist
-                closest = item
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") or v:IsA("BasePart") then
+            local id = v:GetAttribute("CollectibleId") or v.Name
+            if id and id ~= "" and not collectedIds[id] then
+                local itemPos = getPosition(v)
+                local dist = (itemPos - pos).Magnitude
+                if dist < closestDist and dist > MIN_DISTANCE then
+                    closestDist = dist
+                    closest = v
+                end
             end
         end
     end
@@ -173,10 +119,15 @@ local function teleportCollect()
     local closest, dist = getClosestCollectible(currentPos)
     
     if closest then
-        local targetPos = closest.position + Vector3.new(0, 3, 0)
+        local targetPos = getPosition(closest) + Vector3.new(0, 3, 0)
         teleportTo(targetPos)
         task.wait(0.05)
-        collectItem(closest.id)
+        
+        local id = closest:GetAttribute("CollectibleId") or closest.Name
+        if id and not collectedIds[id] then
+            collectItem(id)
+        end
+        
         task.wait(0.1)
         return true
     end
@@ -192,13 +143,32 @@ local function collectNearby()
     if not rootPart then return end
     
     local pos = rootPart.Position
-    local ids = getAllCollectibleIds()
     
-    for _, item in pairs(ids) do
-        if not collectedIds[item.id] then
-            local dist = (item.position - pos).Magnitude
-            if dist <= COLLECT_RADIUS then
-                collectItem(item.id)
+    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
+    if clientCollectibles then
+        for _, child in pairs(clientCollectibles:GetDescendants()) do
+            if child:IsA("Model") or child:IsA("BasePart") then
+                local id = child:GetAttribute("CollectibleId") or child.Name
+                if id and id ~= "" and not collectedIds[id] then
+                    local itemPos = getPosition(child)
+                    local dist = (itemPos - pos).Magnitude
+                    if dist <= COLLECT_RADIUS then
+                        collectItem(id)
+                    end
+                end
+            end
+        end
+    end
+    
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") or v:IsA("BasePart") then
+            local id = v:GetAttribute("CollectibleId") or v.Name
+            if id and id ~= "" and not collectedIds[id] then
+                local itemPos = getPosition(v)
+                local dist = (itemPos - pos).Magnitude
+                if dist <= COLLECT_RADIUS then
+                    collectItem(id)
+                end
             end
         end
     end
