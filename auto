@@ -2,14 +2,18 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local CollectibleStream = ReplicatedStorage:WaitForChild("MogOrDie"):WaitForChild("CollectibleStream")
 
-local COLLECT_RADIUS = 999999
+local COLLECT_RADIUS = 50
+local TELEPORT_RADIUS = 5000
 local AUTO_COOLDOWN = 0.01
+local MIN_DISTANCE = 3
 
 local collectedIds = {}
+local teleportCooldown = 0
 
 local function collectItem(id)
     if collectedIds[id] then return end
@@ -18,17 +22,21 @@ local function collectItem(id)
     task.wait(0.005)
 end
 
-local function getAllCollectibles()
-    local found = {}
+local function getClosestCollectible(pos)
+    local closest = nil
+    local closestDist = TELEPORT_RADIUS
     
     local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
     if clientCollectibles then
         for _, child in pairs(clientCollectibles:GetDescendants()) do
-            if child:IsA("Model") or child:IsA("Part") or child:IsA("Folder") then
+            if child:IsA("Model") or child:IsA("Part") then
                 local id = child:GetAttribute("CollectibleId") or child.Name
-                if id and id ~= "" and not found[id] then
-                    found[id] = true
-                    collectItem(id)
+                if id and id ~= "" and not collectedIds[id] then
+                    local dist = (child.Position - pos).Magnitude
+                    if dist < closestDist and dist > MIN_DISTANCE then
+                        closestDist = dist
+                        closest = child
+                    end
                 end
             end
         end
@@ -37,14 +45,110 @@ local function getAllCollectibles()
     for _, v in pairs(Workspace:GetDescendants()) do
         if v:IsA("Model") or v:IsA("Part") then
             local id = v:GetAttribute("CollectibleId") or v.Name
-            if id and id ~= "" and not found[id] then
-                found[id] = true
-                collectItem(id)
+            if id and id ~= "" and not collectedIds[id] then
+                local dist = (v.Position - pos).Magnitude
+                if dist < closestDist and dist > MIN_DISTANCE then
+                    closestDist = dist
+                    closest = v
+                end
+            end
+        end
+    end
+    
+    return closest, closestDist
+end
+
+local function teleportTo(position)
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid:ChangeState(Enum.HumanoidStateType.Landed)
+        humanoid.AutoRotate = false
+    end
+    
+    local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Linear)
+    local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(position)})
+    tween:Play()
+    tween.Completed:Wait()
+    
+    if humanoid then
+        humanoid.AutoRotate = true
+    end
+end
+
+local function teleportCollect()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local currentPos = rootPart.Position
+    local closest, dist = getClosestCollectible(currentPos)
+    
+    if closest then
+        local targetPos = closest.Position + Vector3.new(0, 3, 0)
+        teleportTo(targetPos)
+        task.wait(0.05)
+        
+        local id = closest:GetAttribute("CollectibleId") or closest.Name
+        if id and not collectedIds[id] then
+            collectItem(id)
+        end
+        
+        task.wait(0.1)
+        return true
+    end
+    
+    return false
+end
+
+local function collectNearby()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local pos = rootPart.Position
+    
+    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
+    if clientCollectibles then
+        for _, child in pairs(clientCollectibles:GetDescendants()) do
+            if child:IsA("Model") or child:IsA("Part") then
+                local id = child:GetAttribute("CollectibleId") or child.Name
+                if id and id ~= "" and not collectedIds[id] then
+                    local dist = (child.Position - pos).Magnitude
+                    if dist <= COLLECT_RADIUS then
+                        collectItem(id)
+                    end
+                end
+            end
+        end
+    end
+    
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") or v:IsA("Part") then
+            local id = v:GetAttribute("CollectibleId") or v.Name
+            if id and id ~= "" and not collectedIds[id] then
+                local dist = (v.Position - pos).Magnitude
+                if dist <= COLLECT_RADIUS then
+                    collectItem(id)
+                end
             end
         end
     end
 end
 
-while wait(0.5) do
-    getAllCollectibles()
+while wait(0.05) do
+    collectNearby()
+    local success = teleportCollect()
+    if not success then
+        task.wait(1)
+    end
 end
