@@ -1,10 +1,17 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local CollectibleStream = ReplicatedStorage:WaitForChild("MogOrDie"):WaitForChild("CollectibleStream")
+local CollectibleStream = ReplicatedStorage:FindFirstChild("MogOrDie")
+if CollectibleStream then
+    CollectibleStream = CollectibleStream:FindFirstChild("CollectibleStream")
+end
+
+if not CollectibleStream then
+    warn("CollectibleStream not found!")
+    return
+end
 
 local collectedIds = {}
 local collectibleTable = nil
@@ -12,22 +19,23 @@ local collectibleTable = nil
 local function getCollectibleTable()
     if collectibleTable then return collectibleTable end
     
-    local success, result = pcall(function()
-        local env = getfenv(0)
-        if env and env.collectibles then
-            return env.collectibles
+    local env = getfenv(0)
+    if env then
+        if env.v_u_46 then
+            collectibleTable = env.v_u_46
+            print("Found v_u_46 with", table.count and table.count(env.v_u_46) or "unknown", "entries")
+            return collectibleTable
         end
-        if env and env.v_u_46 then
-            return env.v_u_46
+        if env.collectibles then
+            collectibleTable = env.collectibles
+            print("Found collectibles with", table.count and table.count(env.collectibles) or "unknown", "entries")
+            return collectibleTable
         end
-        if _G.collectibles then
-            return _G.collectibles
-        end
-        return nil
-    end)
+    end
     
-    if success and result then
-        collectibleTable = result
+    if _G.collectibles then
+        collectibleTable = _G.collectibles
+        print("Found _G.collectibles")
         return collectibleTable
     end
     
@@ -43,28 +51,45 @@ end
 local function collectAll()
     local table = getCollectibleTable()
     if table then
+        local count = 0
         for id, record in pairs(table) do
             if type(record) == "table" and not collectedIds[id] then
                 collectItem(id)
-                task.wait(0.01)
+                count = count + 1
+                if count % 50 == 0 then
+                    task.wait()
+                end
             end
+        end
+        if count > 0 then
+            print("Collected", count, "items from internal table")
         end
     end
     
     local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
     if clientCollectibles then
+        local count = 0
         for _, child in pairs(clientCollectibles:GetDescendants()) do
             if child:IsA("Model") or child:IsA("BasePart") then
                 local id = child:GetAttribute("CollectibleId") or child.Name
                 if id and id ~= "" and not collectedIds[id] then
                     collectItem(id)
-                    task.wait(0.01)
+                    count = count + 1
+                    if count % 50 == 0 then
+                        task.wait()
+                    end
                 end
             end
+        end
+        if count > 0 then
+            print("Collected", count, "items from workspace")
         end
     end
 end
 
-while wait(0.5) do
+print("Auto Collect Started!")
+print("Checking for collectibles...")
+
+while wait(1) do
     collectAll()
 end
