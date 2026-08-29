@@ -3,181 +3,401 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
 
 local LocalPlayer = Players.LocalPlayer
-local CollectibleStream = ReplicatedStorage:WaitForChild("MogOrDie"):WaitForChild("CollectibleStream")
 
-local COLLECT_RADIUS = 50
-local TELEPORT_RADIUS = 5000
-local AUTO_COOLDOWN = 0.01
-local MIN_DISTANCE = 3
-
-local collectedIds = {}
-
-local function getPosition(obj)
-    if obj:IsA("Model") then
-        local root = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head") or obj:FindFirstChild("Torso")
-        if root then
-            return root.Position
-        end
-        local parts = {}
-        for _, v in pairs(obj:GetDescendants()) do
-            if v:IsA("BasePart") then
-                table.insert(parts, v)
-            end
-        end
-        if #parts > 0 then
-            local sum = Vector3.new(0, 0, 0)
-            for _, v in pairs(parts) do
-                sum = sum + v.Position
-            end
-            return sum / #parts
-        end
-        return obj:GetPivot().Position
-    elseif obj:IsA("BasePart") then
-        return obj.Position
-    end
-    return Vector3.new(0, 0, 0)
-end
-
-local function collectItem(id)
-    if collectedIds[id] then return end
-    collectedIds[id] = true
-    CollectibleStream:FireServer("collect", id)
-    task.wait(0.005)
-end
-
-local function getClosestCollectible(pos)
-    local closest = nil
-    local closestDist = TELEPORT_RADIUS
+local function createGUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CollectibleTester"
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
     
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 600, 0, 400)
+    mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Parent = screenGui
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 0)
+    title.Text = "Collectible Tester - Testing All Methods"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.BackgroundTransparency = 1
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.Parent = mainFrame
+    
+    local statusText = Instance.new("TextLabel")
+    statusText.Size = UDim2.new(1, -20, 0, 30)
+    statusText.Position = UDim2.new(0, 10, 0, 45)
+    statusText.Text = "Testing in progress..."
+    statusText.TextColor3 = Color3.fromRGB(255, 200, 100)
+    statusText.BackgroundTransparency = 1
+    statusText.Font = Enum.Font.Gotham
+    statusText.TextSize = 14
+    statusText.TextXAlignment = Enum.TextXAlignment.Left
+    statusText.Parent = mainFrame
+    
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Size = UDim2.new(1, -20, 1, -90)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 80)
+    scrollFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.Parent = mainFrame
+    
+    local corner2 = Instance.new("UICorner")
+    corner2.CornerRadius = UDim.new(0, 8)
+    corner2.Parent = scrollFrame
+    
+    local uiList = Instance.new("UIListLayout")
+    uiList.Padding = UDim.new(0, 4)
+    uiList.SortOrder = Enum.SortOrder.LayoutOrder
+    uiList.Parent = scrollFrame
+    
+    return screenGui, statusText, scrollFrame, uiList
+end
+
+local screenGui, statusText, scrollFrame, uiList = createGUI()
+
+local function addResult(text, color)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 24)
+    label.Text = text
+    label.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextWrapped = true
+    label.Parent = scrollFrame
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, uiList.AbsoluteContentSize.Y + 20)
+    task.wait(0.05)
+end
+
+local function testMethod(name, func)
+    addResult("--- Testing: " .. name .. " ---", Color3.fromRGB(100, 200, 255))
+    local success, err = pcall(func)
+    if success then
+        addResult("✓ " .. name .. " - SUCCESS", Color3.fromRGB(100, 255, 100))
+    else
+        addResult("✗ " .. name .. " - FAILED: " .. tostring(err), Color3.fromRGB(255, 100, 100))
+    end
+    task.wait(0.1)
+end
+
+local function findAllCollectibles()
+    local results = {}
+    
+    -- Method 1: Internal table from getfenv
+    local success, env = pcall(function()
+        return getfenv(0)
+    end)
+    if success and env then
+        if env.collectibles then
+            for id, record in pairs(env.collectibles) do
+                if type(record) == "table" then
+                    table.insert(results, {id = id, data = record, source = "getfenv(0).collectibles"})
+                end
+            end
+        end
+        if env.v_u_46 then
+            for id, record in pairs(env.v_u_46) do
+                if type(record) == "table" then
+                    table.insert(results, {id = id, data = record, source = "getfenv(0).v_u_46"})
+                end
+            end
+        end
+    end
+    
+    -- Method 2: Global collectibles
+    local success, global = pcall(function()
+        return _G.collectibles
+    end)
+    if success and global then
+        for id, record in pairs(global) do
+            if type(record) == "table" then
+                table.insert(results, {id = id, data = record, source = "_G.collectibles"})
+            end
+        end
+    end
+    
+    -- Method 3: Find in workspace
     local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
     if clientCollectibles then
         for _, child in pairs(clientCollectibles:GetDescendants()) do
             if child:IsA("Model") or child:IsA("BasePart") then
                 local id = child:GetAttribute("CollectibleId") or child.Name
-                if id and id ~= "" and not collectedIds[id] then
-                    local itemPos = getPosition(child)
-                    local dist = (itemPos - pos).Magnitude
-                    if dist < closestDist and dist > MIN_DISTANCE then
-                        closestDist = dist
-                        closest = child
+                if id and id ~= "" then
+                    local pos
+                    if child:IsA("Model") then
+                        local root = child:FindFirstChild("HumanoidRootPart") or child:FindFirstChild("Head") or child:FindFirstChild("Torso")
+                        if root then pos = root.Position end
+                        if not pos then pos = child:GetPivot().Position end
+                    else
+                        pos = child.Position
+                    end
+                    table.insert(results, {id = id, data = {Position = pos}, source = "Workspace.ClientCollectibles"})
+                end
+            end
+        end
+    end
+    
+    -- Method 4: Search entire workspace
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Model") or v:IsA("BasePart") then
+            local id = v:GetAttribute("CollectibleId") or v.Name
+            if id and id ~= "" and not string.match(id, "Part") and not string.match(id, "Base") then
+                local pos
+                if v:IsA("Model") then
+                    local root = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChild("Head") or v:FindFirstChild("Torso")
+                    if root then pos = root.Position end
+                    if not pos then pos = v:GetPivot().Position end
+                else
+                    pos = v.Position
+                end
+                if pos then
+                    table.insert(results, {id = id, data = {Position = pos}, source = "Workspace.Full"})
+                end
+            end
+        end
+    end
+    
+    -- Method 5: ReplicatedStorage
+    local mogOrDie = ReplicatedStorage:FindFirstChild("MogOrDie")
+    if mogOrDie then
+        local templates = mogOrDie:FindFirstChild("MogOrDieCollectibleTemplates")
+        if templates then
+            for _, child in pairs(templates:GetDescendants()) do
+                if child:IsA("Model") or child:IsA("BasePart") then
+                    local id = child:GetAttribute("CollectibleType") or child.Name
+                    if id and id ~= "" then
+                        table.insert(results, {id = id, data = {template = true}, source = "ReplicatedStorage.Templates"})
                     end
                 end
             end
         end
     end
     
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Model") or v:IsA("BasePart") then
-            local id = v:GetAttribute("CollectibleId") or v.Name
-            if id and id ~= "" and not collectedIds[id] then
-                local itemPos = getPosition(v)
-                local dist = (itemPos - pos).Magnitude
-                if dist < closestDist and dist > MIN_DISTANCE then
-                    closestDist = dist
-                    closest = v
-                end
-            end
-        end
-    end
-    
-    return closest, closestDist
+    return results
 end
 
-local function teleportTo(position)
-    local character = LocalPlayer.Character
-    if not character then return end
+local function testRemoteEvents()
+    local mogOrDie = ReplicatedStorage:FindFirstChild("MogOrDie")
+    if not mogOrDie then return end
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then
-        humanoid:ChangeState(Enum.HumanoidStateType.Landed)
-        humanoid.AutoRotate = false
+    local collectibleStream = mogOrDie:FindFirstChild("CollectibleStream")
+    if collectibleStream then
+        addResult("Found CollectibleStream remote event", Color3.fromRGB(100, 255, 100))
+        return collectibleStream
     end
+    return nil
+end
+
+local function testFireServer()
+    local stream = testRemoteEvents()
+    if not stream then return end
     
-    local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(rootPart, tweenInfo, {CFrame = CFrame.new(position)})
-    tween:Play()
-    tween.Completed:Wait()
-    
-    if humanoid then
-        humanoid.AutoRotate = true
+    local ids = findAllCollectibles()
+    if #ids > 0 then
+        local testId = ids[1].id
+        addResult("Testing FireServer with ID: " .. tostring(testId), Color3.fromRGB(255, 200, 100))
+        local success, err = pcall(function()
+            stream:FireServer("collect", testId)
+        end)
+        if success then
+            addResult("✓ FireServer succeeded for ID: " .. tostring(testId), Color3.fromRGB(100, 255, 100))
+        else
+            addResult("✗ FireServer failed: " .. tostring(err), Color3.fromRGB(255, 100, 100))
+        end
     end
 end
 
-local function teleportCollect()
-    local character = LocalPlayer.Character
-    if not character then return false end
+local function testAllFireMethods()
+    local stream = testRemoteEvents()
+    if not stream then return end
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return false end
+    local ids = findAllCollectibles()
+    local testIds = {}
+    for i = 1, math.min(5, #ids) do
+        table.insert(testIds, ids[i].id)
+    end
     
-    local currentPos = rootPart.Position
-    local closest, dist = getClosestCollectible(currentPos)
-    
-    if closest then
-        local targetPos = getPosition(closest) + Vector3.new(0, 3, 0)
-        teleportTo(targetPos)
-        task.wait(0.05)
-        
-        local id = closest:GetAttribute("CollectibleId") or closest.Name
-        if id and not collectedIds[id] then
-            collectItem(id)
-        end
-        
+    for _, id in pairs(testIds) do
+        -- Method 1: Direct string
+        addResult("Testing method 1: collect, " .. tostring(id), Color3.fromRGB(200, 200, 255))
+        local success, err = pcall(function()
+            stream:FireServer("collect", id)
+        end)
+        addResult(success and "✓ Success" or "✗ " .. tostring(err), success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
         task.wait(0.1)
-        return true
+        
+        -- Method 2: CollectibleId as number
+        addResult("Testing method 2: collect, " .. tostring(id), Color3.fromRGB(200, 200, 255))
+        local success, err = pcall(function()
+            stream:FireServer("collect", tonumber(id))
+        end)
+        addResult(success and "✓ Success" or "✗ " .. tostring(err), success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        task.wait(0.1)
+        
+        -- Method 3: With position
+        local pos = Vector3.new(0, 0, 0)
+        addResult("Testing method 3: collect, " .. tostring(id) .. ", " .. tostring(pos), Color3.fromRGB(200, 200, 255))
+        local success, err = pcall(function()
+            stream:FireServer("collect", id, pos)
+        end)
+        addResult(success and "✓ Success" or "✗ " .. tostring(err), success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100))
+        task.wait(0.1)
     end
-    
-    return false
 end
 
-local function collectNearby()
-    local character = LocalPlayer.Character
-    if not character then return end
+local function testGetAllIds()
+    local ids = findAllCollectibles()
+    addResult("Found " .. #ids .. " collectible entries", Color3.fromRGB(100, 200, 255))
     
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
+    local idMap = {}
+    for _, item in pairs(ids) do
+        if not idMap[item.id] then
+            idMap[item.id] = 0
+        end
+        idMap[item.id] = idMap[item.id] + 1
+    end
     
-    local pos = rootPart.Position
+    addResult("Unique IDs: " .. #idMap, Color3.fromRGB(100, 200, 255))
     
-    local clientCollectibles = Workspace:FindFirstChild("ClientCollectibles")
-    if clientCollectibles then
-        for _, child in pairs(clientCollectibles:GetDescendants()) do
-            if child:IsA("Model") or child:IsA("BasePart") then
-                local id = child:GetAttribute("CollectibleId") or child.Name
-                if id and id ~= "" and not collectedIds[id] then
-                    local itemPos = getPosition(child)
-                    local dist = (itemPos - pos).Magnitude
-                    if dist <= COLLECT_RADIUS then
-                        collectItem(id)
+    for id, count in pairs(idMap) do
+        local sources = {}
+        for _, item in pairs(ids) do
+            if item.id == id then
+                table.insert(sources, item.source)
+            end
+        end
+        addResult("ID: " .. tostring(id) .. " (found in " .. table.concat(sources, ", ") .. ")", Color3.fromRGB(150, 150, 200))
+    end
+end
+
+local function startTesting()
+    statusText.Text = "Testing all methods..."
+    task.wait(1)
+    
+    addResult("========================================", Color3.fromRGB(255, 255, 255))
+    addResult("STARTING COMPREHENSIVE TEST", Color3.fromRGB(255, 200, 100))
+    addResult("========================================", Color3.fromRGB(255, 255, 255))
+    task.wait(0.5)
+    
+    testMethod("Find All Collectibles", function()
+        local ids = findAllCollectibles()
+        addResult("Found " .. #ids .. " total collectible entries", Color3.fromRGB(100, 255, 100))
+        return true
+    end)
+    
+    testMethod("Test Remote Event", function()
+        local stream = testRemoteEvents()
+        return stream ~= nil
+    end)
+    
+    testMethod("Test FireServer Methods", testAllFireMethods)
+    
+    testMethod("Test Get All IDs", testGetAllIds)
+    
+    testMethod("Test Teleport to Collectible", function()
+        local character = LocalPlayer.Character
+        if not character then return false end
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+        
+        local ids = findAllCollectibles()
+        local found = false
+        for _, item in pairs(ids) do
+            if item.data and item.data.Position then
+                local pos = item.data.Position
+                if type(pos) == "Vector3" then
+                    local tween = TweenService:Create(root, TweenInfo.new(0.1), {CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))})
+                    tween:Play()
+                    tween.Completed:Wait()
+                    found = true
+                    break
+                end
+            end
+        end
+        return found
+    end)
+    
+    testMethod("Test Collect All Nearby", function()
+        local character = LocalPlayer.Character
+        if not character then return false end
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+        
+        local stream = testRemoteEvents()
+        if not stream then return false end
+        
+        local ids = findAllCollectibles()
+        local count = 0
+        for _, item in pairs(ids) do
+            if item.data and item.data.Position then
+                local pos = item.data.Position
+                if type(pos) == "Vector3" then
+                    local dist = (pos - root.Position).Magnitude
+                    if dist < 100 then
+                        stream:FireServer("collect", item.id)
+                        count = count + 1
+                        task.wait(0.01)
                     end
                 end
             end
         end
+        addResult("Attempted to collect " .. count .. " nearby items", Color3.fromRGB(100, 255, 100))
+        return true
+    end)
+    
+    addResult("========================================", Color3.fromRGB(255, 255, 255))
+    addResult("TESTING COMPLETE", Color3.fromRGB(255, 200, 100))
+    addResult("========================================", Color3.fromRGB(255, 255, 255))
+    addResult("Copy all results from this window", Color3.fromRGB(255, 200, 100))
+    addResult("Paste them back to get the final working script", Color3.fromRGB(255, 200, 100))
+    addResult("========================================", Color3.fromRGB(255, 255, 255))
+    
+    statusText.Text = "Testing complete! Copy results below."
+end
+
+local function copyResultsToClipboard()
+    local text = ""
+    for _, child in pairs(scrollFrame:GetChildren()) do
+        if child:IsA("TextLabel") then
+            text = text .. child.Text .. "\n"
+        end
     end
     
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("Model") or v:IsA("BasePart") then
-            local id = v:GetAttribute("CollectibleId") or v.Name
-            if id and id ~= "" and not collectedIds[id] then
-                local itemPos = getPosition(v)
-                local dist = (itemPos - pos).Magnitude
-                if dist <= COLLECT_RADIUS then
-                    collectItem(id)
-                end
-            end
-        end
+    if setclipboard then
+        setclipboard(text)
+        addResult("✓ Results copied to clipboard!", Color3.fromRGB(100, 255, 100))
+    else
+        addResult("! Select all text and copy manually", Color3.fromRGB(255, 200, 100))
     end
 end
 
-while wait(0.05) do
-    collectNearby()
-    local success = teleportCollect()
-    if not success then
-        task.wait(1)
-    end
-end
+task.spawn(startTesting)
+
+local copyButton = Instance.new("TextButton")
+copyButton.Size = UDim2.new(0, 120, 0, 30)
+copyButton.Position = UDim2.new(1, -130, 1, -40)
+copyButton.Text = "Copy Results"
+copyButton.BackgroundColor3 = Color3.fromRGB(50, 50, 80)
+copyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+copyButton.Font = Enum.Font.Gotham
+copyButton.TextSize = 14
+copyButton.Parent = screenGui
+
+local corner3 = Instance.new("UICorner")
+corner3.CornerRadius = UDim.new(0, 6)
+corner3.Parent = copyButton
+
+copyButton.MouseButton1Click:Connect(copyResultsToClipboard)
