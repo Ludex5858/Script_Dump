@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Ludex5858/Script_Dump/main/SCRIPT?t=" .. tostring(os.time())))()
