@@ -1,0 +1,9 @@
+local P=game:GetService("Players")
+local function u(c,p)local bp=p:FindFirstChild("Backpack")local hK=(bp and bp:FindFirstChild("Knife"))or c:FindFirstChild("Knife")local hG=(bp and bp:FindFirstChild("Gun"))or c:FindFirstChild("Gun")local hl=c:FindFirstChild("W")if hK then if not hl then hl=Instance.new("Highlight")hl.Name="W"hl.Parent=c end hl.FillColor=Color3.new(1,0,0)hl.OutlineColor=Color3.new(1,0,0)hl.DepthMode=4 elseif hG then if not hl then hl=Instance.new("Highlight")hl.Name="W"hl.Parent=c end hl.FillColor=Color3.new(0,0,1)hl.OutlineColor=Color3.new(0,0,1)hl.DepthMode=4 elseif hl then hl:Destroy()end end
+local function setup(c,p)u(c,p)local bp=p:WaitForChild("Backpack",5)if bp then bp.ChildAdded:Connect(function()u(c,p)end)bp.ChildRemoved:Connect(function()u(c,p)end)end c.ChildAdded:Connect(function()u(c,p)end)c.ChildRemoved:Connect(function()u(c,p)end)end
+local function h(p)p.CharacterAdded:Connect(function(c)setup(c,p)end)if p.Character then setup(p.Character,p)end end
+for _,p in ipairs(P:GetPlayers())do h(p)end
+P.PlayerAdded:Connect(h)
+local function tag(o)if o.Name=="GunDrop"and not o:FindFirstChild("D")then local hl=Instance.new("Highlight")hl.Name="D"hl.FillColor=Color3.new(0,0,1)hl.OutlineColor=Color3.new(0,0,1)hl.DepthMode=4 hl.Parent=o local t=Instance.new("BillboardGui",o)t.Size=UDim2.new(0,100,0,30)t.StudsOffset=Vector3.new(0,2,0)t.AlwaysOnTop=true t.Adornee=o local l=Instance.new("TextLabel",t)l.Size=UDim2.new(1,0,1,0)l.BackgroundTransparency=1 l.Text=o.Name l.TextColor3=Color3.new(1,1,1)l.TextScaled=true end end
+for _,o in ipairs(workspace:GetDescendants())do tag(o)end
+workspace.DescendantAdded:Connect(tag)
