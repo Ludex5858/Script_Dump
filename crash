@@ -1,3 +1,7 @@
+local T,P=game:GetService("TeleportService"),game.Players.LocalPlayer
+local function hop(w)task.spawn(function()task.wait(w)while task.wait(2.5)do pcall(T.Teleport,T,game.PlaceId,P,game.JobId)end end)end
+hop(T:GetLocalPlayerTeleportData()==game.JobId and 0 or 10)
+
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local SRC=[==[local RunService=game:GetService("RunService")
