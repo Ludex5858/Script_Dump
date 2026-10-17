@@ -75,24 +75,23 @@ state.thread=nil
 state.cache=nil
 end
 return{start=start,stop=stop,toggle=function()if state.running then stop()else start()end end,isRunning=function()return state.running end,}]==]
-local loader=coroutine.create(function()
 local chunk=loadstring(SRC)
-if not chunk then return end
-local ok,api=pcall(chunk)
-if ok and type(api)=="table" then
-_G.__ALT=api
+local api=chunk and select(2,pcall(chunk))
+local gui=Instance.new("ScreenGui")
+gui.Name="AltGui"
+gui.ResetOnSpawn=false
+gui.Parent=Players.LocalPlayer:WaitForChild("PlayerGui")
+local startBtn=Instance.new("TextButton")
+startBtn.Size=UDim2.new(0,100,0,40)
+startBtn.Position=UDim2.new(0,20,0,20)
+startBtn.Text="Start"
+startBtn.Parent=gui
+local stopBtn=Instance.new("TextButton")
+stopBtn.Size=UDim2.new(0,100,0,40)
+stopBtn.Position=UDim2.new(0,130,0,20)
+stopBtn.Text="Stop"
+stopBtn.Parent=gui
+if api then
+startBtn.MouseButton1Click:Connect(function()pcall(api.start)end)
+stopBtn.MouseButton1Click:Connect(function()pcall(api.stop)end)
 end
-end)
-coroutine.resume(loader)
-loader=nil
-local api=_G.__ALT
-_G.__ALT=nil
-task.spawn(function()
-if api and api.start then
-pcall(api.start)
-end
-task.wait(2)
-if api and api.stop then
-pcall(api.stop)
-end
-end)
