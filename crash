@@ -2,7 +2,7 @@ local T,H,P=game:GetService("TeleportService"),game:GetService("HttpService"),ga
 local s,d={}
 task.spawn(function()pcall(function()for _,v in next,H:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")).data do if v.playing<v.maxPlayers and v.id~=game.JobId then s[#s+1]=v.id end end end)d=true end)
 local function hop(w)task.spawn(function()task.wait(w)repeat task.wait()until d for i=1,10 do if #s<1 then break end pcall(T.TeleportToPlaceInstance,T,game.PlaceId,s[math.random(#s)],P)task.wait(1)end P:Kick()end)end
-hop(10)
+hop(15)
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
