@@ -1,6 +1,8 @@
-local T,P=game:GetService("TeleportService"),game.Players.LocalPlayer
-local function hop(w)task.spawn(function()task.wait(w)while task.wait(2.5)do pcall(T.Teleport,T,game.PlaceId,P,game.JobId)end end)end
-hop(T:GetLocalPlayerTeleportData()==game.JobId and 0 or 10)
+local T,H,P=game:GetService("TeleportService"),game:GetService("HttpService"),game.Players.LocalPlayer
+local s,d={}
+task.spawn(function()pcall(function()for _,v in next,H:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")).data do if v.playing<v.maxPlayers and v.id~=game.JobId then s[#s+1]=v.id end end end)d=true end)
+local function hop(w)task.spawn(function()task.wait(w)repeat task.wait()until d for i=1,10 do if #s<1 then break end pcall(T.TeleportToPlaceInstance,T,game.PlaceId,s[math.random(#s)],P)task.wait(1)end P:Kick()end)end
+hop(10)
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
